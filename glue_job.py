@@ -48,7 +48,7 @@ def read_mongo_data(spark, database, collection, start_date, end_date):
           .load()
           .filter((col("created_at") >= start_timestamp) & (col("created_at") <= end_timestamp)))
 
-    logger.info(f"📊 Dados lidos do MongoDB: {df.count()} registros")
+    logger.info(f"Dados lidos do MongoDB: {df.count()} registros")
     return df
 
 def process_conversations_spark(df):
@@ -77,7 +77,7 @@ def generate_csv_spark(df, output_path):
      .option("header", "true")
      .csv(output_path))
 
-    logger.info(f"📄 CSV gerado em: {output_path}")
+    logger.info(f"CSV gerado em: {output_path}")
 
 def upload_to_s3(local_path, bucket, key):
     """Upload do CSV para S3"""
@@ -92,13 +92,13 @@ def upload_to_s3(local_path, bucket, key):
         content = f.read()
 
     result = uploader.upload_file(content, bucket, key)
-    logger.info(f"📤 Upload para S3 concluído: {result}")
+    logger.info(f"Upload para S3 concluido: {result}")
     return result
 
 def main():
     """Função principal do Glue Job Spark"""
     try:
-        logger.info("🚀 Iniciando Glue Job Spark para extração de conversas")
+        logger.info("Iniciando Glue Job Spark para extracao de conversas")
 
         # Obter argumentos do Glue Job
         args = getResolvedOptions(sys.argv, ['JOB_NAME', 'START_DATE', 'END_DATE', 'MONGO_DATABASE', 'MONGO_COLLECTION', 'S3_BUCKET'])
@@ -146,11 +146,11 @@ def main():
             "processing_timestamp": datetime.now(timezone.utc).isoformat()
         }
 
-        logger.info("✅ Glue Job Spark concluído com sucesso")
+        logger.info("Glue Job Spark concluido com sucesso")
         print(result)
 
     except Exception as e:
-        logger.error(f"❌ Erro no Glue Job Spark: {e}", exc_info=True)
+        logger.error(f"Erro no Glue Job Spark: {e}", exc_info=True)
         raise
 
 if __name__ == "__main__":

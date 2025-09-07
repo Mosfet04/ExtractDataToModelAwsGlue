@@ -3,6 +3,7 @@ boto3
 pymongo
 numpy
 certifi
+python-dateutil
 # Dependências para versão Spark
 pyspark
 # Conector MongoDB para Spark (versão compatível com Spark 3.x)
