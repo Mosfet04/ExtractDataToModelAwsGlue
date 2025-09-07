@@ -8,7 +8,7 @@
   },
   "command" : {
     "name" : "glueetl",
-    "scriptLocation" : "s3://aws-glue-assets-985539793628-us-east-1/scripts/Job_ExtractDataToModelML.py",
+    "scriptLocation" : "s3://aws-glue-assets-985539793628-us-east-1/scripts/glue_job.py",
     "pythonVersion" : "3"
   },
   "defaultArguments" : {
@@ -20,7 +20,9 @@
     "--enable-glue-datacatalog" : "true",
     "--job-bookmark-option" : "job-bookmark-disable",
     "--job-language" : "python",
-    "--TempDir" : "s3://aws-glue-assets-985539793628-us-east-1/temporary/"
+    "--TempDir" : "s3://aws-glue-assets-985539793628-us-east-1/temporary/",
+    "--additional-python-modules" : "pymongo,python-dateutil",
+    "--conf" : "spark.jars.packages=org.mongodb.spark:mongo-spark-connector_2.12:3.0.1"
   },
   "connections" : {
     "connections" : [ "Mongodb connection" ]
@@ -38,6 +40,6 @@
     "provider" : "GITHUB",
     "repository" : "ExtractDataToModelAwsGlue",
     "branch" : "master",
-    "folder" : "Job_ExtractDataToModelML"
+    "folder" : ""
   }
 }
