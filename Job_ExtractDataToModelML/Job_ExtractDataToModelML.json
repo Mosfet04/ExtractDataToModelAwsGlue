@@ -1,0 +1,43 @@
+{
+  "name" : "Job_ExtractDataToModelML",
+  "jobMode" : "VISUAL",
+  "description" : "",
+  "role" : "arn:aws:iam::985539793628:role/service-role/AWSGlueServiceRole",
+  "executionProperty" : {
+    "maxConcurrentRuns" : 1
+  },
+  "command" : {
+    "name" : "glueetl",
+    "scriptLocation" : "s3://aws-glue-assets-985539793628-us-east-1/scripts/Job_ExtractDataToModelML.py",
+    "pythonVersion" : "3"
+  },
+  "defaultArguments" : {
+    "--enable-metrics" : "true",
+    "--enable-spark-ui" : "true",
+    "--spark-event-logs-path" : "s3://aws-glue-assets-985539793628-us-east-1/sparkHistoryLogs/",
+    "--enable-job-insights" : "true",
+    "--enable-observability-metrics" : "true",
+    "--enable-glue-datacatalog" : "true",
+    "--job-bookmark-option" : "job-bookmark-disable",
+    "--job-language" : "python",
+    "--TempDir" : "s3://aws-glue-assets-985539793628-us-east-1/temporary/"
+  },
+  "connections" : {
+    "connections" : [ "Mongodb connection" ]
+  },
+  "maxRetries" : 0,
+  "allocatedCapacity" : 10,
+  "timeout" : 480,
+  "maxCapacity" : 10.0,
+  "glueVersion" : "5.0",
+  "numberOfWorkers" : 10,
+  "workerType" : "G.1X",
+  "executionClass" : "STANDARD",
+  "codeGenConfigurationNodes" : "{\"node-1757280023062\":{\"ConnectorDataSource\":{\"ConnectionType\":\"mongodb\",\"Data\":{\"partitionerOptions.partitionKey\":\"_id\",\"disableUpdateUri\":\"false\",\"database\":\"agno\",\"partitioner\":\"com.mongodb.spark.sql.connector.read.partitioner.SinglePartitionPartitioner\",\"partitionerOptions.partitionSizeMB\":\"10\",\"collection\":\"storage\",\"connectionName\":\"Mongodb connection\"},\"Name\":\"MongoDB\"}}}",
+  "sourceControlDetails" : {
+    "provider" : "GITHUB",
+    "repository" : "ExtractDataToModelAwsGlue",
+    "branch" : "master",
+    "folder" : "Job_ExtractDataToModelML"
+  }
+}
