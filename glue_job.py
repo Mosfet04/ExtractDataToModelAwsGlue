@@ -1,26 +1,24 @@
 """
-AWS Glue Job para extração de dados do MongoDB, processamento para ML e upload para S3
-Adaptado da função Lambda original
-
-📋 NOTA: Existe uma versão Spark deste job em glue_job_spark.py
-que oferece melhor performance e escalabilidade usando PySpark e GlueContext.
-Considere migrar para a versão Spark para processamento distribuído.
+AWS Glue Job Spark para extração de dados do MongoDB, processamento para ML e upload para S3
+Usa PySpark e GlueContext para processamento distribuído
 """
-import json
-import logging
-import os
 import sys
+import os
 from datetime import datetime, timezone, timedelta
 from dateutil.relativedelta import relativedelta
-from typing import Dict, Any
+from awsglue.transforms import *
+from awsglue.utils import getResolvedOptions
+from pyspark.context import SparkContext
+from pyspark.sql import SparkSession
+from pyspark.sql.functions import *
+from pyspark.sql.types import *
+import logging
 
 # Adicionar o caminho para os módulos locais
 sys.path.append(os.path.dirname(os.path.abspath(__file__)))
 
 from utils.validators import EventValidator
-from factories.repository_factory import RepositoryFactory
 from services.conversation_extraction_service import ConversationExtractionService
-from services.csv_generator_service import TrainingCSVGenerator
 from services.s3_upload_service import S3FileUploader
 from config.constants import S3Config
 
@@ -28,176 +26,132 @@ from config.constants import S3Config
 logger = logging.getLogger()
 logger.setLevel(logging.INFO)
 
-class ConversationExtractionOrchestrator:
-    """
-    Orquestrador principal que coordena todo o processo
-    Implementa o padrão Facade e Single Responsibility
-    """
+def create_spark_session():
+    """Cria SparkSession com configurações para MongoDB"""
+    return (SparkSession.builder
+            .appName("ConversationExtractionSpark")
+            .config("spark.mongodb.input.uri", os.environ.get('MONGO_URI'))
+            .config("spark.mongodb.output.uri", os.environ.get('MONGO_URI'))
+            .config("spark.jars.packages", "org.mongodb.spark:mongo-spark-connector_2.12:3.0.1")
+            .getOrCreate())
 
-    def __init__(self):
-        self._repository = None
-        self._extraction_service = None
-        self._csv_generator = TrainingCSVGenerator()
-        self._s3_uploader = S3FileUploader()
+def read_mongo_data(spark, database, collection, start_date, end_date):
+    """Lê dados do MongoDB usando Spark DataFrame"""
+    # Converter datas para timestamp
+    start_timestamp = int(datetime.strptime(f"{start_date} 00:00:00", "%Y-%m-%d %H:%M:%S").timestamp())
+    end_timestamp = int(datetime.strptime(f"{end_date} 23:59:59", "%Y-%m-%d %H:%M:%S").timestamp())
 
-    def process_extraction_request(self, event: Dict[str, Any]) -> Dict[str, Any]:
-        """
-        Processa solicitação de extração de conversas
+    # Ler dados do MongoDB
+    df = (spark.read.format("mongo")
+          .option("database", database)
+          .option("collection", collection)
+          .load()
+          .filter((col("created_at") >= start_timestamp) & (col("created_at") <= end_timestamp)))
 
-        Args:
-            event: Evento com start_date e end_date
+    logger.info(f"📊 Dados lidos do MongoDB: {df.count()} registros")
+    return df
 
-        Returns:
-            Resultado do processamento
-        """
-        try:
-            # 1. Validar evento
-            self._validate_event(event)
+def process_conversations_spark(df):
+    """Processa conversas usando Spark DataFrame operations"""
+    # Aqui podemos adicionar transformações Spark
+    # Por enquanto, apenas selecionar campos básicos
+    processed_df = df.select(
+        col("_id").alias("session_id"),
+        col("agent_name"),
+        col("model_provider"),
+        col("model_id"),
+        col("created_at"),
+        col("runs")  # Manter runs para processamento posterior
+    )
 
-            # 2. Configurar dependências
-            self._setup_dependencies()
+    # Adicionar processamento de métricas usando UDFs se necessário
+    # processed_df = processed_df.withColumn("total_runs", size(col("runs")))
 
-            # 3. Extrair dados
-            start_date = event.get('start_date', (datetime.now(timezone.utc) - relativedelta(months=1)).date().strftime('%Y-%m-%d'))
-            end_date = event.get('end_date', (datetime.now(timezone.utc) - timedelta(days=1)).date().strftime('%Y-%m-%d'))
+    return processed_df
 
-            logger.info(f"🔧 Iniciando extração para {start_date} - {end_date}")
+def generate_csv_spark(df, output_path):
+    """Gera CSV usando Spark DataFrame"""
+    # Escrever como CSV particionado
+    (df.write
+     .mode("overwrite")
+     .option("header", "true")
+     .csv(output_path))
 
-            conversations = self._extraction_service.extract(start_date, end_date)
+    logger.info(f"📄 CSV gerado em: {output_path}")
 
-            # 4. Gerar CSV
-            csv_content = self._csv_generator.generate_csv(conversations)
+def upload_to_s3(local_path, bucket, key):
+    """Upload do CSV para S3"""
+    uploader = S3FileUploader()
 
-            # 5. Upload para S3
-            s3_key = self._generate_s3_key(start_date, end_date)
-            bucket = os.environ.get('S3_BUCKET', S3Config.DEFAULT_BUCKET)
+    # Como estamos usando Glue, podemos usar o DynamicFrame para upload
+    # Por simplicidade, usar o uploader existente
+    # Nota: Em produção, seria melhor usar Glue's S3 sink
 
-            upload_result = self._s3_uploader.upload_file(csv_content, bucket, s3_key)
+    # Ler o CSV gerado e fazer upload
+    with open(f"{local_path}/part-00000-*.csv", 'r') as f:
+        content = f.read()
 
-            # 6. Preparar resultado
-            result = self._prepare_success_result(
-                start_date, end_date, conversations, csv_content, s3_key, upload_result
-            )
-
-            logger.info("✅ Processo concluído com sucesso")
-            return result
-
-        except Exception as e:
-            logger.error(f"❌ Erro no processo: {e}")
-            raise
-
-    def _validate_event(self, event: Dict[str, Any]) -> None:
-        """Valida o evento de entrada"""
-        error = EventValidator.validate_extraction_event(event)
-        if error:
-            raise ValueError(error)
-
-    def _setup_dependencies(self) -> None:
-        """Configura as dependências necessárias"""
-        if not self._repository:
-            self._repository = RepositoryFactory.create_conversation_repository()
-
-        if not self._extraction_service:
-            self._extraction_service = ConversationExtractionService(self._repository)
-
-    def _generate_s3_key(self, start_date: str, end_date: str) -> str:
-        """Gera chave S3 para o arquivo"""
-        return f"{S3Config.FOLDER_PREFIX}/{start_date}_to_{end_date}/conversations_{start_date}_to_{end_date}.csv"
-
-    def _prepare_success_result(
-        self,
-        start_date: str,
-        end_date: str,
-        conversations: list,
-        csv_content: str,
-        s3_key: str,
-        upload_result: Dict[str, Any]
-    ) -> Dict[str, Any]:
-        """Prepara resultado de sucesso"""
-        return {
-            "message": f"Conversas entre {start_date} e {end_date} extraídas com sucesso",
-            "extraction_summary": {
-                "start_date": start_date,
-                "end_date": end_date,
-                "date_range_days": self._calculate_date_range_days(start_date, end_date),
-                "total_conversations": len(conversations)
-            },
-            "csv_info": {
-                "size_chars": len(csv_content),
-                "size_bytes": len(csv_content.encode('utf-8')),
-                "s3_key": s3_key
-            },
-            "s3_upload": upload_result,
-            "processing_timestamp": datetime.now(timezone.utc).isoformat()
-        }
-
-    def _calculate_date_range_days(self, start_date: str, end_date: str) -> int:
-        """Calcula número de dias no intervalo"""
-        start = datetime.strptime(start_date, '%Y-%m-%d')
-        end = datetime.strptime(end_date, '%Y-%m-%d')
-        return (end - start).days + 1
-
+    result = uploader.upload_file(content, bucket, key)
+    logger.info(f"📤 Upload para S3 concluído: {result}")
+    return result
 
 def main():
-    """
-    Função principal do Glue Job
-    """
+    """Função principal do Glue Job Spark"""
     try:
-        logger.info("🚀 Iniciando Glue Job para extração de conversas")
+        logger.info("🚀 Iniciando Glue Job Spark para extração de conversas")
 
-        # Parâmetros do job (podem ser passados via argumentos ou variáveis de ambiente)
-        start_date = os.environ.get('START_DATE')
-        end_date = os.environ.get('END_DATE')
+        # Obter argumentos do Glue Job
+        args = getResolvedOptions(sys.argv, ['JOB_NAME', 'START_DATE', 'END_DATE', 'MONGO_DATABASE', 'MONGO_COLLECTION', 'S3_BUCKET'])
+
+        start_date = args.get('START_DATE')
+        end_date = args.get('END_DATE')
+        mongo_database = args.get('MONGO_DATABASE', 'conversations')
+        mongo_collection = args.get('MONGO_COLLECTION', 'sessions')
+        s3_bucket = args.get('S3_BUCKET', S3Config.DEFAULT_BUCKET)
 
         if not start_date or not end_date:
             # Valores padrão
             start_date = (datetime.now(timezone.utc) - relativedelta(months=1)).date().strftime('%Y-%m-%d')
             end_date = (datetime.now(timezone.utc) - timedelta(days=1)).date().strftime('%Y-%m-%d')
 
-        event = {
-            "start_date": start_date,
-            "end_date": end_date
+        logger.info(f"📦 Parâmetros: start_date={start_date}, end_date={end_date}")
+
+        # Criar Spark Session
+        spark = create_spark_session()
+        sc = SparkContext.getOrCreate()
+
+        # Ler dados do MongoDB
+        df = read_mongo_data(spark, mongo_database, mongo_collection, start_date, end_date)
+
+        # Processar dados
+        processed_df = process_conversations_spark(df)
+
+        # Gerar CSV
+        temp_output_path = "/tmp/conversations_csv"
+        generate_csv_spark(processed_df, temp_output_path)
+
+        # Upload para S3
+        s3_key = f"{S3Config.FOLDER_PREFIX}/{start_date}_to_{end_date}/conversations_{start_date}_to_{end_date}.csv"
+        upload_result = upload_to_s3(temp_output_path, s3_bucket, s3_key)
+
+        # Resultado
+        result = {
+            "message": f"Conversas entre {start_date} e {end_date} extraídas com sucesso",
+            "extraction_summary": {
+                "start_date": start_date,
+                "end_date": end_date,
+                "total_conversations": processed_df.count()
+            },
+            "s3_upload": upload_result,
+            "processing_timestamp": datetime.now(timezone.utc).isoformat()
         }
 
-        logger.info(f"📦 Parâmetros: {json.dumps(event, default=str)}")
-
-        # Criar orquestrador e processar
-        orchestrator = ConversationExtractionOrchestrator()
-        result = orchestrator.process_extraction_request(event)
-
-        logger.info("✅ Glue Job concluído com sucesso")
-
-        # Salvar resultado em arquivo ou log
-        print(json.dumps({
-            'success': True,
-            'process': 'extract_conversations_date_range_for_training',
-            'timestamp': datetime.now(timezone.utc).isoformat(),
-            'result': result
-        }, indent=2, default=str))
-
-    except ValueError as ve:
-        logger.error(f"❌ Erro de validação: {ve}")
-        print(json.dumps({
-            'success': False,
-            'error': str(ve),
-            'example': {
-                'start_date': '2024-12-20',
-                'end_date': '2024-12-25'
-            },
-            'timestamp': datetime.now(timezone.utc).isoformat()
-        }, indent=2, default=str))
-        sys.exit(1)
+        logger.info("✅ Glue Job Spark concluído com sucesso")
+        print(result)
 
     except Exception as e:
-        logger.error(f"❌ Erro crítico: {e}", exc_info=True)
-        print(json.dumps({
-            'success': False,
-            'process': 'extract_conversations_date_range_for_training',
-            'error': str(e),
-            'timestamp': datetime.now(timezone.utc).isoformat()
-        }, indent=2, default=str))
-        sys.exit(1)
-
+        logger.error(f"❌ Erro no Glue Job Spark: {e}", exc_info=True)
+        raise
 
 if __name__ == "__main__":
     main()
