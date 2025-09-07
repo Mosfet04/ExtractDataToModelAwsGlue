@@ -14,8 +14,8 @@ from pyspark.sql.functions import *
 from pyspark.sql.types import *
 import logging
 
-# Adicionar o caminho para os módulos locais
-sys.path.append(os.path.dirname(os.path.abspath(__file__)))
+# Adicionar o caminho para os módulos locais (não necessário com --extra-py-files)
+# sys.path.append(os.path.dirname(os.path.abspath(__file__)))
 
 from utils.validators import EventValidator
 from services.conversation_extraction_service import ConversationExtractionService

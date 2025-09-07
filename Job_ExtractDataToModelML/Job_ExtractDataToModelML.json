@@ -22,7 +22,8 @@
     "--job-language" : "python",
     "--TempDir" : "s3://aws-glue-assets-985539793628-us-east-1/temporary/",
     "--additional-python-modules" : "pymongo,python-dateutil",
-    "--conf" : "spark.jars.packages=org.mongodb.spark:mongo-spark-connector_2.12:3.0.1"
+    "--conf" : "spark.jars.packages=org.mongodb.spark:mongo-spark-connector_2.12:3.0.1",
+    "--extra-py-files" : "s3://aws-glue-assets-985539793628-us-east-1/scripts/modules.zip"
   },
   "connections" : {
     "connections" : [ "Mongodb connection" ]
