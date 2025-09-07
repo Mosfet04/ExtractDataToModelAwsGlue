@@ -3,3 +3,7 @@ boto3
 pymongo
 numpy
 certifi
+# Dependências para versão Spark
+pyspark
+# Conector MongoDB para Spark (versão compatível com Spark 3.x)
+org.mongodb.spark:mongo-spark-connector_2.12:3.0.1

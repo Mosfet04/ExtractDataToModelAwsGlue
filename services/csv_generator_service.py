@@ -1,6 +1,10 @@
 """
 Gerador de CSV refatorado
 Segue o Single Responsibility Principle
+
+⚠️ DEPRECIADO: Este serviço está sendo descontinuado.
+A geração de CSV agora é feita de forma nativa e distribuída pelo Spark no glue_job_spark.py
+usando DataFrame.write.csv() para melhor performance e escalabilidade.
 """
 import csv
 import io
@@ -17,11 +21,14 @@ class TrainingCSVGenerator(ICSVGenerator):
     """Gerador de CSV específico para dados de treinamento"""
 
     def __init__(self):
+        logger.warning("⚠️ TrainingCSVGenerator está depreciado. Use glue_job_spark.py para geração de CSV com Spark.")
         self._fieldnames = self._get_csv_fieldnames()
 
     def generate_csv(self, conversations: List[Dict[str, Any]]) -> str:
         """
         Gera CSV formatado para treinamento
+
+        ⚠️ DEPRECIADO: Use Spark DataFrame.write.csv() em glue_job_spark.py
 
         Args:
             conversations: Lista de conversas processadas
@@ -29,6 +36,7 @@ class TrainingCSVGenerator(ICSVGenerator):
         Returns:
             Conteúdo CSV como string
         """
+        logger.warning("⚠️ generate_csv() está depreciado. Migre para processamento Spark.")
         if not conversations:
             return self._generate_empty_csv()
 

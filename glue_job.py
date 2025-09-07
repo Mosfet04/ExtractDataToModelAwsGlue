@@ -1,6 +1,10 @@
 """
 AWS Glue Job para extração de dados do MongoDB, processamento para ML e upload para S3
 Adaptado da função Lambda original
+
+📋 NOTA: Existe uma versão Spark deste job em glue_job_spark.py
+que oferece melhor performance e escalabilidade usando PySpark e GlueContext.
+Considere migrar para a versão Spark para processamento distribuído.
 """
 import json
 import logging
