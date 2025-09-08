@@ -1,6 +1,6 @@
 {
   "name" : "Job_ExtractDataToModelML",
-  "jobMode" : "VISUAL",
+  "jobMode" : "SCRIPT",
   "description" : "",
   "role" : "arn:aws:iam::985539793628:role/service-role/AWSGlueServiceRole",
   "executionProperty" : {
@@ -31,9 +31,6 @@
     "--MONGO_SECRET_NAME" : "mongodb-atlas-credentials",
     "--MONGO_HOST" : "agnoragteste.hdwgg2q.mongodb.net"
   },
-  "connections" : {
-    "connections" : [ ]
-  },
   "maxRetries" : 0,
   "allocatedCapacity" : 10,
   "timeout" : 480,
@@ -42,7 +39,6 @@
   "numberOfWorkers" : 10,
   "workerType" : "G.1X",
   "executionClass" : "STANDARD",
-  "codeGenConfigurationNodes" : "{\"node-1757280023062\":{\"ConnectorDataSource\":{\"ConnectionType\":\"mongodb\",\"Data\":{\"partitionerOptions.partitionKey\":\"_id\",\"disableUpdateUri\":\"false\",\"database\":\"agno\",\"partitioner\":\"com.mongodb.spark.sql.connector.read.partitioner.SinglePartitionPartitioner\",\"partitionerOptions.partitionSizeMB\":\"10\",\"collection\":\"storage\",\"connectionName\":\"Mongodb connection\"},\"Name\":\"MongoDB\"}}}",
   "sourceControlDetails" : {
     "provider" : "GITHUB",
     "repository" : "ExtractDataToModelAwsGlue",
