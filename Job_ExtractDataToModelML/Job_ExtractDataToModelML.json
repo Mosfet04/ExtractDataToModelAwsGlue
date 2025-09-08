@@ -22,10 +22,17 @@
     "--job-language" : "python",
     "--TempDir" : "s3://aws-glue-assets-985539793628-us-east-1/temporary/",
     "--conf" : "spark.jars.packages=org.mongodb.spark:mongo-spark-connector_2.12:3.0.1",
-    "--extra-py-files" : "s3://aws-glue-assets-985539793628-us-east-1/scripts/modules.zip"
+    "--extra-py-files" : "s3://aws-glue-assets-985539793628-us-east-1/scripts/modules.zip",
+    "--START_DATE" : "2025-08-01",
+    "--END_DATE" : "2025-08-31",
+    "--MONGO_DATABASE" : "agno",
+    "--MONGO_COLLECTION" : "storage",
+    "--S3_BUCKET" : "aws-glue-assets-985539793628-us-east-1",
+    "--MONGO_SECRET_NAME" : "mongodb-atlas-credentials",
+    "--MONGO_HOST" : "agnoragteste.hdwgg2q.mongodb.net"
   },
   "connections" : {
-    "connections" : [ "Mongodb connection" ]
+    "connections" : [ ]
   },
   "maxRetries" : 0,
   "allocatedCapacity" : 10,
